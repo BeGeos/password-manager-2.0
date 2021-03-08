@@ -6,6 +6,7 @@ import mysql.connector
 import time
 import random
 import string
+from getpass import getpass
 from env import secret_keys
 
 
@@ -213,11 +214,11 @@ def actions(account):
             update(account, record_account, new_password)
         elif user_choice.lower() == 'r':
             record_account = input('Name of the account to look up:  ')
-            master_key = input('Master Password (required):  ')
+            master_key = getpass(prompt='Master Password (required):  ')
             read(account, record_account, master_key)
         elif user_choice.lower() == 'd':
             record_account = input('Name of the account to delete:  ')
-            master_key = input('Master Password (required):  ')
+            master_key = getpass(prompt='Master Password (required):  ')
             alias = input('Use the alias of the account. If you haven\'t provided the name of the account'
                           ' you can use the alias but one of the 2 must be used:  ')
             delete(account, record_account, master_key, alias)
@@ -236,7 +237,7 @@ def access_account(where_from=False, user=None):
     if not where_from:
         while True:
             account = input('Please enter your username (required):  ')
-            password = input('Master Password (required):  ')
+            password = getpass(prompt='Master Password (required):  ')
 
             main_cur.execute(f"SELECT master_pwd FROM Users WHERE name='{account}'")
             result = main_cur.fetchone()  # tuple
@@ -304,6 +305,12 @@ def password_gen():
     return master_pwd
 
 
+def is_valid(password1, password2):
+    if password2 == password1:
+        return True
+    return False
+
+
 def main():
     """Main logic behind the password manager. To start with Create Mode or Access Mode"""
 
@@ -317,23 +324,32 @@ def main():
             print('You can either type your own password or generate one')
             pwd_selection = input('Type (T) or Generate (G)')
             if pwd_selection.lower() == 't':
-                master_pwd = input('Enter a master password (you will use this password '
-                                   'to access all your stored passwords):  ')
+                while True:
+                    print('Enter a master password (you will use this password '
+                          'to access all your stored passwords):  ')
+                    master_pwd = getpass(prompt='Master Password:  ')
+                    if len(master_pwd) == 0:
+                        print('Password is required')
+                        continue
+                    confirm_pwd = getpass(prompt='Confirm Password:  ')
+                    if is_valid(master_pwd, confirm_pwd):
+                        master_pwd = master_pwd
+                        break
+                    else:
+                        print('Passwords do not match')
+                        continue
             elif pwd_selection.lower() == 'g':  # generate password
                 master_pwd = password_gen()
             else:
                 print(f"No selection {pwd_selection} available")
                 continue
 
-            if len(master_pwd) == 0:
-                print('Password is required')
-                continue
             try:
                 cur.execute(f'CREATE TABLE {username} (id INTEGER PRIMARY KEY AUTOINCREMENT,'
                             f' account_name VARCHAR(255) NOT NULL, password TEXT NOT NULL, alias VARCHAR(64))')
                 conn.commit()
 
-            except OperationalError as op:
+            except OperationalError:
                 print(f'Username {username} already exists')
                 time.sleep(2)
                 continue
